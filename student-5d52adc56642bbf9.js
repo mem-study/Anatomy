@@ -88,6 +88,24 @@
   // work/student-ui.js
   function mountStudent(api, drawing2) {
     const $2 = (id) => document.getElementById(id);
+    const DEFAULT_SECONDS = 90, MIN_SECONDS = 10, MAX_SECONDS = 600, GLOBAL_SECONDS_KEY = "mem-anatomy-station-seconds-v1";
+    function readStoredSeconds() {
+      try {
+        const v = Number.parseInt(localStorage.getItem(GLOBAL_SECONDS_KEY) || "", 10);
+        return Number.isFinite(v) ? v : null;
+      } catch (e) { return null; }
+    }
+    function readGlobalSeconds() {
+      const v = readStoredSeconds();
+      return v === null ? DEFAULT_SECONDS : Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, v));
+    }
+    function saveGlobalSeconds(v) {
+      try { localStorage.setItem(GLOBAL_SECONDS_KEY, String(v)); } catch (e) {}
+    }
+    function applyGlobalSeconds(stations) {
+      const seconds = readGlobalSeconds();
+      return stations.map((s) => ({ ...s, seconds }));
+    }
     let project = null, session = null, busy = false, reviewing = false, displayedStation = null;
     const loading3 = $2("studentLoading");
     const setLoading = (text) => {
@@ -141,7 +159,7 @@
     }
     function describe() {
       try {
-        const ss = trainingStations(selected());
+        const ss = applyGlobalSeconds(trainingStations(selected()));
         $2("studentCount").textContent = ss.length;
         $2("studentMinutes").textContent = Math.ceil(ss.reduce((n, s) => n + s.seconds, 0) / 60);
         $2("studentStart").disabled = false;
@@ -170,6 +188,18 @@
       }
     };
     $2("studentShift").onchange = describe;
+    const secondsInput = $2("studentSeconds");
+    if (secondsInput) {
+      secondsInput.value = readGlobalSeconds();
+      secondsInput.addEventListener("change", () => {
+        let v = Number.parseInt(secondsInput.value, 10);
+        if (!Number.isFinite(v)) v = DEFAULT_SECONDS;
+        v = Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, v));
+        secondsInput.value = v;
+        saveGlobalSeconds(v);
+        describe();
+      });
+    }
     const lock = (on) => {
       busy = on;
       for (const id of ["studentNext", "studentEnd", "studentReset", "studentRotate", "studentPan", "studentZoomIn", "studentZoomOut"]) $2(id).disabled = on;
@@ -207,7 +237,7 @@
       lock(true);
       $2("studentStart").disabled = true;
       try {
-        const ss = trainingStations(selected());
+        const ss = applyGlobalSeconds(trainingStations(selected()));
         const ordered = [...ss].sort((a, b) => a.modelKey.localeCompare(b.modelKey) || a.side.localeCompare(b.side));
         for (const [i, station] of ordered.entries()) {
           setLoading(`\u062C\u0627\u0631\u064D \u062A\u062C\u0647\u064A\u0632 \u0627\u0644\u0645\u062D\u0637\u0627\u062A ${i + 1} / ${ss.length}\u2026`);
